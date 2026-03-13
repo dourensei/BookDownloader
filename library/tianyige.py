@@ -32,9 +32,6 @@ class TianyigeLibrary(BaseLibrary):
     _warned_download_list : list
     _last_opened_page_url : str
     _last_failed_page_url : str
-    _last_fascicle_id : str
-    _last_fascicle_name : str
-    _last_fascicle_path : str
 
     def __init__(self, 
                  driver: BaseWebDriver,
@@ -66,9 +63,6 @@ class TianyigeLibrary(BaseLibrary):
         self._warned_download_list = []
         self._last_opened_page_url = ""
         self._last_failed_page_url = ""
-        self._last_fascicle_id = ""
-        self._last_fascicle_name = ""
-        self._last_fascicle_path = ""
 
         # 下载书籍
         result = super().get_book(book_info, save_path)
@@ -295,47 +289,42 @@ class TianyigeLibrary(BaseLibrary):
 
         return duplicate_list
     
-    def _pre_open_book_page(self, book_info, page : int, book_path : str) -> bool:
+    def _post_get_book_page(self, book_info, page : int, book_path : str) -> bool:
         """
-        打开书籍页预处理
+        下载书籍页后处理
 
         :param book_info: 书籍信息
         :param page: 页码（从 1 开始）
         :param book_path: 书籍下载路径
         """
         try:
-            max_page_num_len = book_info["maxPageNumLen"]
             book_fascicles = book_info["fascicle"]
             book_directories = book_info["directory"]
             book_images = book_info["image"]
             image = book_images[page - 1]
+            fascicle = [f for f in book_fascicles if f["fascicleId"] == image["fascicleId"]][0]
 
-            # 获取下载路径
-            filled_page_num = str(image["pageNum"]).zfill(max_page_num_len)
-            fascicle_path = os.path.join(book_path, image["fascicleName"])
-            page_path = os.path.join(fascicle_path, image["directoryName"], filled_page_num)
+            # 书籍分卷的最后一页
+            fascicle_last_page = fascicle["pageNum"] + fascicle["pageCount"] - 1
+            if page == fascicle_last_page:
+                # 获取下载路径
+                fascicle_name = image["fascicleName"]
+                fascicle_path = os.path.join(book_path, fascicle_name)
 
-            # 已发生书籍分卷切换
-            if self._last_fascicle_path != "" and fascicle_path != self._last_fascicle_path:
                 # 创建书籍分卷 PDF 文件
-                last_fascicle_info = [f for f in book_fascicles if f["fascicleId"] == self._last_fascicle_id][0]
-                pdf_page_count = last_fascicle_info["pageCount"]
+                pdf_page_count = fascicle["pageCount"]
                 min_pdf_size = self._split_image_min_size * self._split_image_count * pdf_page_count
-                if utils.is_valid_file(self._last_fascicle_path + ".pdf", min_pdf_size):
-                    self._logger.info(f"跳过已生成 PDF 文件的分卷“{self._last_fascicle_name}”")
+                if utils.is_valid_file(fascicle_path + ".pdf", min_pdf_size):
+                    self._logger.info(f'跳过已生成 PDF 文件的分卷“{fascicle_name}”')
                 else:
-                    self._logger.info(f"正在生成分卷“{self._last_fascicle_name}” PDF 文件...")
-                    dir_list = [d for d in book_directories if d["fascicleId"] == self._last_fascicle_id]
-                    if not self._create_fascicle_pdf(self._last_fascicle_path, dir_list):
-                        self._logger.error(f"生成分卷“{self._last_fascicle_name}” PDF 文件失败")
-
-            self._last_fascicle_id = image["fascicleId"]
-            self._last_fascicle_name = image["fascicleName"]
-            self._last_fascicle_path = fascicle_path
+                    self._logger.info(f'正在生成分卷“{fascicle_name}” PDF 文件...')
+                    dir_list = [d for d in book_directories if d["fascicleId"] == image["fascicleId"]]
+                    if not self._create_fascicle_pdf(fascicle_path, dir_list):
+                        self._logger.error(f"生成分卷“{fascicle_name}” PDF 文件失败")
 
             return True
         except Exception:
-            self._logger.exception(f"打开第 {page} 页预处理异常")
+            self._logger.exception(f"打开第 {page} 页收尾处理异常")
             return False
     
     def _open_book_page(self, book_info, page : int, book_path : str) -> bool:

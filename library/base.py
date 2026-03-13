@@ -71,26 +71,27 @@ class BaseLibrary(ABC):
             failed_page_list = []
             book_page_count = self._get_book_page_count(book_info)
             for i in range(1, book_page_count + 1):
-                # 切换页前的处理
-                if not self._pre_open_book_page(book_info, i, book_path):
-                    self._logger.error(f"打开第 {i} 页预处理失败")
-
+                skip = False
                 # 跳过已下载完成的书籍页
-                if self._is_book_page_downloaded(book_info, i, book_path):
+                if not skip and self._is_book_page_downloaded(book_info, i, book_path):
                     self._logger.info(f"跳过已下载的第 {i}/{book_page_count} 页")
-                    continue
+                    skip = True
 
                 # 打开书籍页
-                if not self._open_book_page(book_info, i, book_path):
+                if not skip and not self._open_book_page(book_info, i, book_path):
                     self._logger.error(f"打开第 {i} 页失败")
                     failed_page_list.append(i)
-                    continue
+                    skip = True
                 
                 # 下载书籍页
-                if not self._get_book_page(book_info, i, book_path):
+                if not skip and not self._get_book_page(book_info, i, book_path):
                     self._logger.error(f"下载第 {i} 页失败")
                     failed_page_list.append(i)
-                    continue
+                    skip = True
+
+                # 下载书籍页收尾处理
+                if not self._post_get_book_page(book_info, i, book_path):
+                    self._logger.error(f"下载第 {i} 页收尾处理失败")
 
             # 检查结果
             if len(failed_page_list) > 0:
@@ -164,9 +165,9 @@ class BaseLibrary(ABC):
         return False
     
     @abstractmethod
-    def _pre_open_book_page(self, book_info, page : int, book_path : str) -> bool:
+    def _post_get_book_page(self, book_info, page : int, book_path : str) -> bool:
         """
-        打开书籍页预处理
+        下载书籍页后处理
 
         :param book_info: 书籍信息
         :param page: 页码（从 1 开始）
