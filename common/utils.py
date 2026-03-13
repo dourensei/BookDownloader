@@ -1,5 +1,6 @@
 import os
 import random
+import sys
 import threading
 import time
 import pyautogui
@@ -86,6 +87,20 @@ def stop_keep_awake():
     _awake_thread = None
     log_utils.get_logger().info("防休眠线程已停止")
 
+def get_base_path():
+    """
+    获取程序基础目录（兼容源码/EXE运行）：
+    - 源码运行：返回main.py所在目录
+    - EXE运行：返回EXE文件所在目录（而非临时目录）
+    """
+    if hasattr(sys, '_MEIPASS'):
+        # EXE运行时，_MEIPASS是临时解压目录，需返回EXE所在目录
+        exe_path = os.path.dirname(sys.executable)  # 获取EXE文件路径
+        return os.path.abspath(exe_path)
+    else:
+        # 源码运行时，返回main.py所在目录
+        return os.path.abspath(os.path.dirname(__file__))
+    
 def get_valid_path_name(name : str, used_names : list=[]) -> str:
     """
     获取有效路径名（替换无效字符、重名添加后缀）

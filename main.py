@@ -14,6 +14,8 @@ def _main():
     主函数
     """
     try:
+        driver = None
+        
         # 初始化日志器（仅在此处执行一次）
         logger = log_utils.setup_logger()
 
@@ -92,12 +94,12 @@ def _main():
             driver.quit()
 
 if __name__ == "__main__":
-    # 兼容exe打包后的路径处理
-    if hasattr(sys, '_MEIPASS'):
-        os.chdir(sys._MEIPASS)
+    # 强制将当前工作目录切换到程序基础目录
+    base_path = utils.get_base_path()
+    os.chdir(base_path)
 
-    # 确保utils包能被导入（兼容exe打包）
-    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+    # 确保子模块能被导入（兼容exe打包）
+    sys.path.append(base_path)
 
     # 主函数
     _main()

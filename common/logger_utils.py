@@ -35,10 +35,6 @@ def setup_logger(
     log_dir = os.path.dirname(log_file)
     if log_dir and not os.path.exists(log_dir):
         os.makedirs(log_dir, exist_ok=True)
-    
-    # 兼容exe打包后的路径（PyInstaller会把路径放到_sys_tmpdir，需处理）
-    if hasattr(sys, '_MEIPASS'):
-        log_file = os.path.join(sys._MEIPASS, log_file)
 
     file_handler = RotatingFileHandler(
         filename=log_file,
