@@ -87,7 +87,7 @@ def stop_keep_awake():
     _awake_thread = None
     log_utils.get_logger().info("防休眠线程已停止")
 
-def get_base_path():
+def get_base_path(module_path : str):
     """
     获取程序基础目录（兼容源码/EXE运行）：
     - 源码运行：返回main.py所在目录
@@ -99,7 +99,7 @@ def get_base_path():
         return os.path.abspath(exe_path)
     else:
         # 源码运行时，返回main.py所在目录
-        return os.path.abspath(os.path.dirname(__file__))
+        return os.path.abspath(os.path.dirname(module_path))
     
 def get_valid_path_name(name : str, used_names : list=[]) -> str:
     """
