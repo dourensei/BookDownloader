@@ -24,6 +24,7 @@ class TianyigeLibrary(BaseLibrary):
 
     _url_cache_file_name : str
     _url_duplicate_file_name : str
+    _book_contents_file_name : str
     _fascicle_contents_file_name : str
     _split_image_min_size : int
     _split_image_rows : int
@@ -36,18 +37,20 @@ class TianyigeLibrary(BaseLibrary):
     _last_failed_page_url : str
 
     def __init__(self, 
-                 driver: BaseWebDriver,
-                 driver_timeout: int=20,
-                 cache_path: str="cache",
-                 patch_path: str="patch",
-                 skip_duplicate: bool=True):
+                 driver : BaseWebDriver,
+                 driver_timeout : int=20,
+                 cache_path : str="cache",
+                 patch_path : str="patch",
+                 skip_duplicate : bool=True,
+                 create_book_pdf : bool=False):
         """
         构造函数
         """
-        super().__init__(driver, driver_timeout, cache_path, patch_path, skip_duplicate)
+        super().__init__(driver, driver_timeout, cache_path, patch_path, skip_duplicate, create_book_pdf)
 
         self._url_cache_file_name = "url.json"
         self._url_duplicate_file_name = "url_duplicate.txt"
+        self._book_contents_file_name = "全书目录.txt"
         self._fascicle_contents_file_name = "分卷目录.txt"
         self._split_image_min_size = 1024 * 50
         self._split_image_rows = 2
@@ -223,13 +226,25 @@ class TianyigeLibrary(BaseLibrary):
         """
         try:
             # 输出分卷目录信息
-            book_contents = self._generate_fascicle_contents(book_info)
+            book_contents = self._generate_book_contents(book_info, True)
 
             if save_path == "":
+                print("分卷目录：")
                 utils.print_tree_structure(book_contents)
             else:
                 with open(os.path.join(save_path, self._fascicle_contents_file_name), "w", encoding="utf8") as f:
                     utils.print_tree_structure(book_contents, f)
+
+            if self._create_book_pdf:
+                # 输出全书目录信息
+                book_contents = self._generate_book_contents(book_info, False)
+
+                if save_path == "":
+                    print("全书目录：")
+                    utils.print_tree_structure(book_contents)
+                else:
+                    with open(os.path.join(save_path, self._book_contents_file_name), "w", encoding="utf8") as f:
+                        utils.print_tree_structure(book_contents, f)
 
             return True
         except Exception:
@@ -557,11 +572,12 @@ class TianyigeLibrary(BaseLibrary):
 
         return not duplicate_exist
     
-    def _generate_fascicle_contents(self, book_info) -> dict:
+    def _generate_book_contents(self, book_info, by_fascicle : bool) -> dict:
         """
-        生成书籍分卷目录信息
+        生成书籍目录信息
 
         :param book_info: 书籍信息
+        :param by_fascicle: 是否生成分卷目录信息（每个分卷的页码独立）
         """
         book_name = book_info["name"]
         book_id = book_info["catalogId"]
@@ -581,13 +597,14 @@ class TianyigeLibrary(BaseLibrary):
         "children": []}
 
         book_page_count = 0
+        fascicle_start_page = 1
         fascicle_page_count = 0
     
         # 解析目录（书籍 -> 分卷 -> 章节 -> 页）
         fascicle_list = [f for f in book_fascicles if f["catalogId"] == book_id]
         for fascicle in fascicle_list:
             fascicle_page_count = 0
-            dir_start_page = 1
+            dir_start_page = 1 if by_fascicle else fascicle_start_page
 
             # 创建分卷节点
             node_fascicle = {
@@ -627,10 +644,16 @@ class TianyigeLibrary(BaseLibrary):
                 fascicle_page_count += dir_page_count
 
             # 更新分卷节点名
-            node_fascicle["name"] = f'{fascicle["name"]}（共 {fascicle_page_count} 页）'
+            if by_fascicle:
+                node_fascicle["name"] = f'{fascicle["name"]}（共 {fascicle_page_count} 页）'
+            else:
+                node_fascicle["name"] = f'{fascicle["name"]}（{fascicle_start_page}）'
 
             # 添加分卷节点
             book_contents["children"].append(node_fascicle)
+
+            # 更新下一分卷起始页码
+            fascicle_start_page += fascicle_page_count
 
             # 更新书籍页数
             book_page_count += fascicle_page_count

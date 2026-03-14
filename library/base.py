@@ -16,13 +16,15 @@ class BaseLibrary(ABC):
     _cache_path : str # TODO 增加补丁机制
     _patch_path : str
     _skip_duplicate : bool
+    _create_book_pdf : bool
 
     def __init__(self, 
-                 driver: BaseWebDriver,
-                 driver_timeout: int=20,
-                 cache_path: str="cache",
-                 patch_path: str="patch",
-                 skip_duplicate: bool=True):
+                 driver : BaseWebDriver,
+                 driver_timeout : int=20,
+                 cache_path : str="cache",
+                 patch_path : str="patch",
+                 skip_duplicate : bool=True,
+                 create_book_pdf : bool=False):
         """
         构造函数
         """
@@ -32,6 +34,7 @@ class BaseLibrary(ABC):
         self._cache_path = cache_path
         self._patch_path = patch_path
         self._skip_duplicate = skip_duplicate
+        self._create_book_pdf = create_book_pdf
 
     def update_driver(self, driver: BaseWebDriver):
         """
