@@ -451,7 +451,7 @@ class TianyigeLibrary(BaseLibrary):
             # 下载所有分割小图
             index = 1
             for url in url_list:
-                file_path = os.path.join(page_path, "{}.jpg".format(index))
+                file_path = os.path.join(page_path, f"{index}.jpg")
 
                 if utils.is_valid_file(file_path, self._split_image_min_size):
                     self._logger.info(f"跳过已下载的图片（{url}）")
@@ -657,7 +657,7 @@ class TianyigeLibrary(BaseLibrary):
         page_path = os.path.join(fascicle_path, image["directoryName"], filled_page_num)
 
         for i in range(1, 1 + self._split_image_count):
-            file_path = os.path.join(page_path, "{}.jpg".format(i))
+            file_path = os.path.join(page_path, f"{i}.jpg")
             if not utils.is_valid_file(file_path, self._split_image_min_size):
                 need_download = True
                 break

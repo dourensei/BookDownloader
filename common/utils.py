@@ -118,10 +118,10 @@ def get_valid_path_name(name : str, used_names : list=[]) -> str:
     # 发生重名时自动添加后缀
     if used_names.count(valid_name) > 0:
         suffix = 1
-        tmp_name = valid_name + "_{}".format(suffix)
+        tmp_name = valid_name + f"_{suffix}"
         while used_names.count(tmp_name) > 0:
             suffix += 1
-            tmp_name = valid_name + "_{}".format(suffix)
+            tmp_name = valid_name + f"_{suffix}"
         valid_name = tmp_name
 
     return valid_name
