@@ -3,6 +3,7 @@ from io import TextIOWrapper
 import json
 import logging
 import os
+import re
 from typing import Any
 from selenium.webdriver.remote.webdriver import BaseWebDriver
 from selenium.webdriver.common.by import By
@@ -37,11 +38,12 @@ class TianyigeLibrary(BaseLibrary):
                  driver: BaseWebDriver,
                  driver_timeout: int=20,
                  cache_path: str="cache",
-                 patch_path: str="patch"):
+                 patch_path: str="patch",
+                 skip_duplicate: bool=True):
         """
         构造函数
         """
-        super().__init__(driver, driver_timeout, cache_path, patch_path)
+        super().__init__(driver, driver_timeout, cache_path, patch_path, skip_duplicate)
 
         self._url_cache_file_name = "url.json"
         self._url_duplicate_file_name = "url_duplicate.txt"
@@ -86,11 +88,16 @@ class TianyigeLibrary(BaseLibrary):
 
             # 检查是否存在图片相同的页
             url_duplicate_file = os.path.join(self._cache_path, self._url_duplicate_file_name)
-            duplicate_list = self._check_duplicate_image_url(book_info)
+            duplicate_list = ["图片相同的页：" + ", ".join(index_list) for index_list in self._check_duplicate_image_url(book_info)]
             if len(duplicate_list) > 0:
-                log_utils.logger_pprint(duplicate_list,
-                                        level=logging.WARNING,
-                                        msg_prefix="以下书籍页的内容相同：")
+                if self._skip_duplicate:
+                    log_utils.logger_pprint(duplicate_list,
+                                            level=logging.INFO,
+                                            msg_prefix="以下书籍页的内容相同，重复页已自动删除：")
+                else:
+                    log_utils.logger_pprint(duplicate_list,
+                                            level=logging.WARNING,
+                                            msg_prefix="以下书籍页的内容相同：")
                 duplicate_info = "\n".join(duplicate_list)
                 with open(url_duplicate_file, "w+", encoding="utf8") as f:
                     f.write(duplicate_info)
@@ -268,26 +275,49 @@ class TianyigeLibrary(BaseLibrary):
             self._logger.exception("更新缓存异常")
             return False
     
-    def _check_duplicate_image_url(self, book_info) -> list:
+    def _check_duplicate_image_url(self, book_info, start : int=1, end : int=-1) -> list:
         """
         检查是否存在重复的图片 URL
         """
         book_id = book_info["catalogId"]
+        if end == -1:
+            end = book_info["pageCount"]
         duplicate_list = []
 
         if self._image_url_cache is not None:
+            # 获取每个 URL 对应的所有页码
             url_to_index = defaultdict(list)
             for index, url in self._image_url_cache[book_id].items():
                 url_to_index[url].append(index)
 
             for url, index_list in url_to_index.items():
                 if len(index_list) > 1:
+                    # 存在重复的页码
                     index_list.sort()
-                    duplicate_list.append("图片相同的页：" + ", ".join(index_list))
+                    for index in index_list:
+                        if int(index) in range(start, end + 1):
+                            # 当重复的页码在检查范围内时
+                            duplicate_list.append(index_list)
+                            break
 
             duplicate_list.sort()
 
         return duplicate_list
+    
+    def _get_skip_page_list(self, book_info, start : int=1, end : int=-1) -> list:
+        """
+        获取可跳过的页码（与上一页重复的）
+        """
+        skip_list = []
+        max_page_num_len = book_info["maxPageNumLen"]
+
+        duplicate_list = self._check_duplicate_image_url(book_info, start, end)
+        for index_list in duplicate_list:
+            for index in index_list:
+                if str(int(index) - 1).zfill(max_page_num_len) in index_list:
+                    skip_list.append(index)
+        
+        return skip_list
     
     def _post_get_book_page(self, book_info, page : int, book_path : str) -> bool:
         """
@@ -319,7 +349,7 @@ class TianyigeLibrary(BaseLibrary):
                 else:
                     self._logger.info(f'正在生成分卷“{fascicle_name}” PDF 文件...')
                     dir_list = [d for d in book_directories if d["fascicleId"] == image["fascicleId"]]
-                    if not self._create_fascicle_pdf(fascicle_path, dir_list):
+                    if not self._create_fascicle_pdf(book_info, fascicle_path, dir_list):
                         self._logger.error(f"生成分卷“{fascicle_name}” PDF 文件失败")
 
             return True
@@ -694,7 +724,7 @@ class TianyigeLibrary(BaseLibrary):
             self._logger.exception(f"切换到第 {page} 页异常")
             return False
 
-    def _create_fascicle_pdf(self, fascicle_path : str, dir_info_list : list) -> bool:
+    def _create_fascicle_pdf(self, book_info, fascicle_path : str, dir_info_list : list) -> bool:
         """
         生成分卷 PDF 文件
         """
@@ -702,12 +732,16 @@ class TianyigeLibrary(BaseLibrary):
         image_paths = []
 
         is_error = False
-        first_page = dir_info_list[0]["pageNum"]
+        dir_start_page = 1
         for dir_info in dir_info_list:
+            # 遍历每个章节
             dir_name = dir_info["name"]
             dir_path = os.path.join(fascicle_path, dir_name)
+
+            # 判断当前章节是否下载完成
             if os.path.exists(dir_path):
-                dir_pages = [f for f in os.listdir(dir_path) if f.endswith(".jpg")]
+                pattern = re.compile(r"\d+.jpg")
+                dir_pages = [f for f in os.listdir(dir_path) if pattern.match(f)]
             else:
                 dir_pages = []
             if len(dir_pages) != dir_info["pageCount"]:
@@ -715,13 +749,38 @@ class TianyigeLibrary(BaseLibrary):
                 is_error = True
                 break
 
-            page_files = [os.path.join(dir_path, f) for f in dir_pages]
+            # 获取可删除的重复页编号（与上一页重复）
+            if self._skip_duplicate:
+                skip_list = self._get_skip_page_list(book_info, 
+                                                    dir_info["pageNum"], 
+                                                    dir_info["pageNum"] + dir_info["pageCount"] -1)
+            else:
+                skip_list = []
+
+            # 获取当前章节所有页对应的图片文件
+            first_page_skipped = False
+            page_files = []
+            for idx, f in enumerate(dir_pages):
+                page_num = os.path.splitext(f)[0]
+                if page_num in skip_list:
+                    self._logger.info(f"跳过重复的第{int(page_num)}页")
+                    if idx == 0:
+                        first_page_skipped = True
+                else:
+                    page_files.append(os.path.join(dir_path, f))
+            
             for f in page_files:
                 image_paths.append(f)
 
-            page = dir_info["pageNum"] - first_page + 1
-            bookmark = {"title": dir_name, "page": page, "level": 0}
+            # 添加当前章节书签
+            if first_page_skipped:
+                bookmark = {"title": dir_name, "page": dir_start_page - 1, "level": 0}
+            else:
+                bookmark = {"title": dir_name, "page": dir_start_page, "level": 0}
             outline.append(bookmark)
+
+            # 更新下一章节起始页码
+            dir_start_page += len(page_files)
 
         if is_error:
             self._logger.error("因缺页取消生成分卷 PDF 文件")

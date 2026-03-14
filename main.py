@@ -85,6 +85,13 @@ def _parse_args():
         help='下载失败时不自动重试（默认会自动重试直至书籍全部下载成功）'
     )
 
+    # 保留重复页
+    parser.add_argument(
+        '-k', '--keep-duplicate',
+        action='store_true',
+        help='生成 PDF 文件时保留重复页（默认会自动删除重复页）'
+    )
+
     args = parser.parse_args()
 
     return args
@@ -116,7 +123,8 @@ def _main():
         download_path : str  = args.save
         cache_path : str  = args.cache
         patch_path : str  = args.patch
-        no_retry : bool  = not args.no_retry
+        no_retry : bool  = args.no_retry
+        skip_duplicate : bool = not args.keep_duplicate
 
         # 初始化 WebDriver
         try:
@@ -142,7 +150,7 @@ def _main():
         # 判断书库
         library : BaseLibrary = None
         if "tianyige.com.cn" in book_url:
-            library = TianyigeLibrary(driver, cache_path=cache_path, patch_path=patch_path)
+            library = TianyigeLibrary(driver, cache_path=cache_path, patch_path=patch_path, skip_duplicate=skip_duplicate)
         else:
             logger.error("不支持该书库")
             return

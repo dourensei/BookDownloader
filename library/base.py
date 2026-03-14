@@ -15,12 +15,14 @@ class BaseLibrary(ABC):
     _driver_timeout : int
     _cache_path : str # TODO 增加补丁机制
     _patch_path : str
+    _skip_duplicate : bool
 
     def __init__(self, 
                  driver: BaseWebDriver,
                  driver_timeout: int=20,
                  cache_path: str="cache",
-                 patch_path: str="patch"):
+                 patch_path: str="patch",
+                 skip_duplicate: bool=True):
         """
         构造函数
         """
@@ -29,6 +31,7 @@ class BaseLibrary(ABC):
         self._driver_timeout = driver_timeout
         self._cache_path = cache_path
         self._patch_path = patch_path
+        self._skip_duplicate = skip_duplicate
 
     def update_driver(self, driver: BaseWebDriver):
         """
@@ -54,11 +57,6 @@ class BaseLibrary(ABC):
             book_path = os.path.join(save_path, book_name)
             if not os.path.isdir(book_path):
                 os.makedirs(book_path, exist_ok=True)
-
-            # 生成书籍目录文件
-            with open(os.path.join(book_path, "目录.txt"), "w", encoding="utf8") as f:
-                if not self._output_book_contents(book_info, f):
-                    self._logger.warning("生成书籍目录文件失败")
 
             # 初始化缓存
             if not os.path.isdir(self._cache_path):
@@ -99,6 +97,13 @@ class BaseLibrary(ABC):
                                         level=logging.ERROR,
                                         msg_prefix="以下书籍页未能成功获取：")
                 return False
+
+            # 生成书籍目录文件
+            with open(os.path.join(book_path, "目录.txt"), "w", encoding="utf8") as f:
+                if not self._output_book_contents(book_info, f):
+                    self._logger.error("生成书籍目录文件失败")
+                else:
+                    self._logger.info("生成书籍目录文件成功")
 
             return True
         except Exception:
