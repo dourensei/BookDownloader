@@ -24,6 +24,7 @@ class TianyigeLibrary(BaseLibrary):
 
     _url_cache_file_name : str
     _url_duplicate_file_name : str
+    _fascicle_contents_file_name : str
     _split_image_min_size : int
     _split_image_rows : int
     _split_image_cols : int
@@ -47,6 +48,7 @@ class TianyigeLibrary(BaseLibrary):
 
         self._url_cache_file_name = "url.json"
         self._url_duplicate_file_name = "url_duplicate.txt"
+        self._fascicle_contents_file_name = "分卷目录.txt"
         self._split_image_min_size = 1024 * 50
         self._split_image_rows = 2
         self._split_image_cols = 4
@@ -212,17 +214,27 @@ class TianyigeLibrary(BaseLibrary):
         """
         return book_info["pageCount"]
     
-    def _output_book_contents(self, book_info, file : TextIOWrapper=None) -> bool:
+    def _output_book_contents(self, book_info, save_path : str="") -> bool:
         """
         输出书籍目录
 
         :param book_info: 书籍信息
-        :param file: 输出文件对象，省略时输出到控制台
+        :param save_path: 输出文件保存文件夹路径，省略时输出到控制台
         """
-        book_contents = self._generate_book_contents(book_info)
-        utils.print_tree_structure(book_contents, file)
+        try:
+            # 输出分卷目录信息
+            book_contents = self._generate_fascicle_contents(book_info)
 
-        return True
+            if save_path == "":
+                utils.print_tree_structure(book_contents)
+            else:
+                with open(os.path.join(save_path, self._fascicle_contents_file_name), "w", encoding="utf8") as f:
+                    utils.print_tree_structure(book_contents, f)
+
+            return True
+        except Exception:
+            self._logger.exception("输出书籍目录异常")
+            return False
     
     def _init_cache(self, book_info) -> bool:
         """
@@ -545,9 +557,9 @@ class TianyigeLibrary(BaseLibrary):
 
         return not duplicate_exist
     
-    def _generate_book_contents(self, book_info) -> dict:
+    def _generate_fascicle_contents(self, book_info) -> dict:
         """
-        生成书籍目录信息
+        生成书籍分卷目录信息
 
         :param book_info: 书籍信息
         """
@@ -555,18 +567,28 @@ class TianyigeLibrary(BaseLibrary):
         book_id = book_info["catalogId"]
         book_fascicles = book_info["fascicle"]
         book_directories = book_info["directory"]
-        book_images = book_info["image"]
+        max_page_num_len = book_info["maxPageNumLen"]
+
+        # 获取可删除的重复页编号（与上一页重复）
+        if self._skip_duplicate:
+            skip_list = self._get_skip_page_list(book_info)
+        else:
+            skip_list = []
 
         # 创建目录根节点
         book_contents = {
-        "name": "{} (1 - {})".format(book_name, len(book_images)),
+        "name": "",
         "children": []}
+
+        book_page_count = 0
+        fascicle_page_count = 0
     
         # 解析目录（书籍 -> 分卷 -> 章节 -> 页）
-        page_num = 1
         fascicle_list = [f for f in book_fascicles if f["catalogId"] == book_id]
         for fascicle in fascicle_list:
-            page_count = 0
+            fascicle_page_count = 0
+            dir_start_page = 1
+
             # 创建分卷节点
             node_fascicle = {
                 "name": "",
@@ -578,19 +600,43 @@ class TianyigeLibrary(BaseLibrary):
                         and d["fascicleId"] == fascicle["fascicleId"]]
             
             for dir in dir_list:
-                # 添加章节节点
-                if dir["pageCount"] > 1:
-                    node_dir = { "name": "{} ({} - {})".format(dir["name"], dir["pageNum"], dir["pageNum"] + dir["pageCount"] - 1) }
+                # 获取当前章节页数
+                first_page_skipped = False
+                dir_page_count = dir["pageCount"]
+                for idx, page_num in enumerate(range(dir["pageNum"], dir["pageNum"] + dir["pageCount"])):
+                    if str(page_num).zfill(max_page_num_len) in skip_list:
+                        dir_page_count -= 1
+                        if idx == 0:
+                            first_page_skipped = True
+
+                # 创建章节节点
+                if first_page_skipped:
+                    start_page_tmp = dir_start_page - 1
                 else:
-                    node_dir = { "name": "{} ({})".format(dir["name"], dir["pageNum"]) }
+                    start_page_tmp = dir_start_page
+
+                node_dir = { "name": f'{dir["name"]}（{start_page_tmp}）' }
+
+                # 添加章节节点
                 node_fascicle["children"].append(node_dir)
 
+                # 更新下一章节起始页码
+                dir_start_page += dir_page_count
+
+                # 更新当前分卷页数
+                fascicle_page_count += dir_page_count
+
+            # 更新分卷节点名
+            node_fascicle["name"] = f'{fascicle["name"]}（共 {fascicle_page_count} 页）'
+
             # 添加分卷节点
-            if fascicle["pageCount"] > 1:
-                node_fascicle["name"] = "{} ({} - {})".format(fascicle["name"], fascicle["pageNum"], fascicle["pageNum"] + fascicle["pageCount"] - 1)
-            else:
-                node_fascicle["name"] = "{} ({})".format(fascicle["name"], fascicle["pageNum"])
             book_contents["children"].append(node_fascicle)
+
+            # 更新书籍页数
+            book_page_count += fascicle_page_count
+
+        # 更新书籍名
+        book_contents["name"] = f'{book_name}（共 {book_page_count} 页）'
 
         return book_contents
     
@@ -610,7 +656,7 @@ class TianyigeLibrary(BaseLibrary):
         fascicle_path = os.path.join(book_path, image["fascicleName"])
         page_path = os.path.join(fascicle_path, image["directoryName"], filled_page_num)
 
-        for i in range(1, self._split_image_count + 1):
+        for i in range(1, 1 + self._split_image_count):
             file_path = os.path.join(page_path, "{}.jpg".format(i))
             if not utils.is_valid_file(file_path, self._split_image_min_size):
                 need_download = True

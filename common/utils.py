@@ -169,12 +169,20 @@ def is_valid_file(file_path : str, min_size : int) -> bool:
 def print_tree_structure(data, output_file=None):
     """
     输出树形结构数据
+
+    :param data: 树形结构数据
+    :param output_file: 输出文件对象，省略时输出到控制台
     """
     _print_tree_structure(data, prefix="", is_last=True, f=output_file)
 
 def _print_tree_structure(data, prefix="", is_last=True, f=None):
     """
     递归输出树形结构数据
+
+    :param data: 树形结构数据
+    :param prefix: 前缀
+    :param is_last: 是否最后一个叶节点
+    :param f: 输出文件对象，省略时输出到控制台
     """
     # 输出当前节点
     if prefix:

@@ -68,7 +68,7 @@ class BaseLibrary(ABC):
             # 逐页下载书籍
             failed_page_list = []
             book_page_count = self._get_book_page_count(book_info)
-            for i in range(1, book_page_count + 1):
+            for i in range(1, 1 + book_page_count):
                 skip = False
                 # 跳过已下载完成的书籍页
                 if not skip and self._is_book_page_downloaded(book_info, i, book_path):
@@ -99,11 +99,10 @@ class BaseLibrary(ABC):
                 return False
 
             # 生成书籍目录文件
-            with open(os.path.join(book_path, "目录.txt"), "w", encoding="utf8") as f:
-                if not self._output_book_contents(book_info, f):
-                    self._logger.error("生成书籍目录文件失败")
-                else:
-                    self._logger.info("生成书籍目录文件成功")
+            if not self._output_book_contents(book_info, book_path):
+                self._logger.error("生成书籍目录文件失败")
+            else:
+                self._logger.info("生成书籍目录文件成功")
 
             return True
         except Exception:
@@ -142,12 +141,12 @@ class BaseLibrary(ABC):
         return 0
     
     @abstractmethod
-    def _output_book_contents(self, book_info, file : TextIOWrapper=None) -> bool:
+    def _output_book_contents(self, book_info, save_path : str="") -> bool:
         """
         输出书籍目录
 
         :param book_info: 书籍信息
-        :param file: 输出文件对象，省略时输出到控制台
+        :param save_path: 输出文件保存文件夹路径，省略时输出到控制台
         """
         return False
     
