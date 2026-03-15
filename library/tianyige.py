@@ -879,8 +879,16 @@ class TianyigeLibrary(BaseLibrary):
         :param book_path: 书籍下载路径
         """
         book_id = book_info["catalogId"]
+        book_name = book_info["name"]
         book_fascicles = book_info["fascicle"]
         book_directories = book_info["directory"]
+
+        # 如果已生成过，则直接退出
+        pdf_page_count = book_info["pageCount"]
+        min_pdf_size = self._split_image_min_size * self._split_image_count * pdf_page_count
+        if utils.is_valid_file(book_path + ".pdf", min_pdf_size):
+            self._logger.info(f'跳过已生成 PDF 文件的书籍“{book_name}”')
+            return True
 
         outline = []
         image_paths = []
