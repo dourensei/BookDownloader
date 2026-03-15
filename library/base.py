@@ -16,7 +16,7 @@ class BaseLibrary(ABC):
     _cache_path : str # TODO 增加补丁机制
     _patch_path : str
     _skip_duplicate : bool
-    _create_book_pdf : bool
+    _book_pdf : bool
 
     def __init__(self, 
                  driver : BaseWebDriver,
@@ -24,7 +24,7 @@ class BaseLibrary(ABC):
                  cache_path : str="cache",
                  patch_path : str="patch",
                  skip_duplicate : bool=True,
-                 create_book_pdf : bool=False):
+                 book_pdf : bool=False):
         """
         构造函数
         """
@@ -34,7 +34,7 @@ class BaseLibrary(ABC):
         self._cache_path = cache_path
         self._patch_path = patch_path
         self._skip_duplicate = skip_duplicate
-        self._create_book_pdf = create_book_pdf
+        self._book_pdf = book_pdf
 
     def update_driver(self, driver: BaseWebDriver):
         """
@@ -100,6 +100,13 @@ class BaseLibrary(ABC):
                                         level=logging.ERROR,
                                         msg_prefix="以下书籍页未能成功获取：")
                 return False
+            
+            # 生成全书 PDF 文件
+            if self._book_pdf:
+                self._logger.info(f'正在生成“{book_name}” 全书 PDF 文件...')
+                if not self._create_book_pdf(book_info, book_path):
+                    self._logger.error("生成全书 PDF 文件失败")
+                    # return False  # 到这一步说明下载已全部完成，自动重试的意义不大
 
             # 生成书籍目录文件
             if not self._output_book_contents(book_info, book_path):
@@ -211,6 +218,16 @@ class BaseLibrary(ABC):
 
         :param book_info: 书籍信息
         :param page: 页码（从 1 开始）
+        :param book_path: 书籍下载路径
+        """
+        return False
+
+    @abstractmethod
+    def _create_book_pdf(self, book_info, book_path : str) -> bool:
+        """
+        生成全书 PDF 文件
+
+        :param book_info: 书籍信息
         :param book_path: 书籍下载路径
         """
         return False

@@ -235,7 +235,7 @@ class TianyigeLibrary(BaseLibrary):
                 with open(os.path.join(save_path, self._fascicle_contents_file_name), "w", encoding="utf8") as f:
                     utils.print_tree_structure(book_contents, f)
 
-            if self._create_book_pdf:
+            if self._book_pdf:
                 # 输出全书目录信息
                 book_contents = self._generate_book_contents(book_info, False)
 
@@ -866,6 +866,114 @@ class TianyigeLibrary(BaseLibrary):
             return False
         
         # 删除分卷 PDF 临时文件
+        if os.path.exists(tmp_file_path):
+            os.remove(tmp_file_path)
+
+        return True
+    
+    def _create_book_pdf(self, book_info, book_path : str) -> bool:
+        """
+        生成全书 PDF 文件
+
+        :param book_info: 书籍信息
+        :param book_path: 书籍下载路径
+        """
+        book_id = book_info["catalogId"]
+        book_fascicles = book_info["fascicle"]
+        book_directories = book_info["directory"]
+
+        outline = []
+        image_paths = []
+
+        # 获取可删除的重复页编号（与上一页重复）
+        if self._skip_duplicate:
+            skip_list = self._get_skip_page_list(book_info)
+        else:
+            skip_list = []
+
+        is_error = False
+        fascicle_start_page = 1
+        dir_start_page = 1
+
+        # 获取分卷列表
+        fascicle_info_list = [f for f in book_fascicles 
+                             if f["catalogId"] == book_id]
+        for fascicle_info in fascicle_info_list:
+            # 遍历每个分卷
+            fascicle_name = fascicle_info["name"]
+            fascicle_path = os.path.join(book_path, fascicle_name)
+
+            # 添加当前分卷书签
+            bookmark = {"title": fascicle_name, "page": fascicle_start_page, "level": 0}
+            outline.append(bookmark)
+
+            # 获取章节列表
+            dir_info_list = [d for d in book_directories 
+                        if d["catalogId"] == book_id 
+                        and d["fascicleId"] == fascicle_info["fascicleId"]]
+
+            for dir_info in dir_info_list:
+                # 遍历每个章节
+                dir_name = dir_info["name"]
+                dir_path = os.path.join(fascicle_path, dir_name)
+
+                # 判断当前章节是否下载完成
+                if os.path.exists(dir_path):
+                    pattern = re.compile(r"\d+.jpg")
+                    dir_pages = [f for f in os.listdir(dir_path) if pattern.match(f)]
+                else:
+                    dir_pages = []
+                if len(dir_pages) != dir_info["pageCount"]:
+                    self._logger.error(f"分卷“{fascicle_name}”的章节“{dir_name}”下载未完成")
+                    is_error = True
+                    break
+
+                # 获取当前章节所有页对应的图片文件
+                first_page_skipped = False
+                page_files = []
+                for idx, f in enumerate(dir_pages):
+                    page_num = os.path.splitext(f)[0]
+                    if page_num in skip_list:
+                        self._logger.info(f"跳过重复的第{int(page_num)}页")
+                        if idx == 0:
+                            first_page_skipped = True
+                    else:
+                        page_files.append(os.path.join(dir_path, f))
+                
+                for f in page_files:
+                    image_paths.append(f)
+
+                # 添加当前章节书签
+                if first_page_skipped:
+                    bookmark = {"title": dir_name, "page": dir_start_page - 1, "level": 1}
+                else:
+                    bookmark = {"title": dir_name, "page": dir_start_page, "level": 1}
+                outline.append(bookmark)
+
+                # 更新下一章节起始页码
+                dir_start_page += len(page_files)
+
+            # 更新下一分卷起始页码
+            fascicle_start_page = dir_start_page
+
+            if is_error:
+                break
+
+        if is_error:
+            self._logger.error("因缺页取消生成全书 PDF 文件")
+            return False
+
+        # 生成无目录的全书 PDF 临时文件
+        tmp_file_path = book_path + "_tmp.pdf"
+        if not pdf_utils.images_to_pdf(image_paths, tmp_file_path):
+            return False
+        
+        # 生成全书 PDF 文件
+        pdf_file_path = book_path + ".pdf"
+        if not pdf_utils.add_pdf_outline(tmp_file_path, pdf_file_path, outline):
+            return False
+        
+        # 删除全书 PDF 临时文件
         if os.path.exists(tmp_file_path):
             os.remove(tmp_file_path)
 

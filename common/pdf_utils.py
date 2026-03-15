@@ -1,4 +1,4 @@
-from PIL import Image as PILImage
+import img2pdf
 from PyPDF2 import PdfReader, PdfWriter
 import common.logger_utils as log_utils
 
@@ -13,20 +13,9 @@ def images_to_pdf(image_paths : list[str], pdf_path: str) -> bool:
         return False
     
     try:
-        # 读取第一张图，作为 PDF 文件的首页
-        first_img = PILImage.open(image_paths[0]).convert("RGB")
-        rest_imgs = []
-        for path in image_paths[1:]:
-            img = PILImage.open(path).convert("RGB")
-            rest_imgs.append(img)
-        
-        # 将图片转为 PDF 文件（无目录）
-        first_img.save(
-            pdf_path,
-            save_all=True,
-            append_images=rest_imgs,
-            resolution=100.0
-        )
+        # 原先用 PILImage 进行转换在图片较多较大时可能会导致内存不足，因此改用 img2pdf
+        with open(pdf_path, "wb") as f:
+            f.write(img2pdf.convert(image_paths))
 
         log_utils.get_logger().info(f"创建 PDF 文件成功（{pdf_path}）")
         return True
