@@ -1,0 +1,88 @@
+{
+    "url": "https://gj.tianyige.com.cn/#/Book?catalogId={}&fascicleId={}&directoryId={}",
+    "name": "书名",
+    "author": "作者",
+    "catalogId": "catalogIdxxx",
+    "fascicle": [
+        {
+            "fascicleId": "fascicleIdxxx001",
+            "catalogId": "catalogIdxxx",
+            "name": "第一册",
+            "sort": 1,
+            "filePath": null,
+            "imageCount": 62
+        },
+        {
+            "fascicleId": "fascicleIdxxx002",
+            "catalogId": "catalogIdxxx",
+            "name": "第二册",
+            "sort": 2,
+            "filePath": null,
+            "imageCount": 182
+        }
+    ],
+    "directory": [
+        {
+            "directoryId": "directoryIdxxx001",
+            "fascicleId": "fascicleIdxxx001",
+            "catalogId": "catalogIdxxx",
+            "name": "章节1",
+            "sort": 1
+        },
+        {
+            "directoryId": "directoryIdxxx002",
+            "fascicleId": "fascicleIdxxx001",
+            "catalogId": "catalogIdxxx",
+            "name": "章节2",
+            "sort": 2
+        },
+        {
+            "directoryId": "directoryIdxxx003",
+            "fascicleId": "fascicleIdxxx002",
+            "catalogId": "catalogIdxxx",
+            "name": "章节3",
+            "sort": 3
+        },
+        {
+            "directoryId": "directoryIdxxx004",
+            "fascicleId": "fascicleIdxxx002",
+            "catalogId": "catalogIdxxx",
+            "name": "章节4",
+            "sort": 4
+        }
+    ],
+    "image": [
+        {
+            "imageId": "imageIdxxx001",
+            "imageName": "0001",
+            "directoryId": "directoryIdxxx001",
+            "fascicleId": "fascicleIdxxx001",
+            "catalogId": "catalogIdxxx",
+            "sort": 1
+        },
+        {
+            "imageId": "imageIdxxx002",
+            "imageName": "0002",
+            "directoryId": "directoryIdxxx002",
+            "fascicleId": "fascicleIdxxx001",
+            "catalogId": "catalogIdxxx",
+            "sort": 2
+        },
+        {
+            "imageId": "imageIdxxx003",
+            "imageName": "0003",
+            "directoryId": "directoryIdxxx003",
+            "fascicleId": "fascicleIdxxx002",
+            "catalogId": "catalogIdxxx",
+            "sort": 2
+        },
+        {
+            "imageId": "imageIdxxx004",
+            "imageName": "0004",
+            "directoryId": "directoryIdxxx004",
+            "fascicleId": "fascicleIdxxx002",
+            "catalogId": "catalogIdxxx",
+            "sort": 3
+        }
+    ]
+}
