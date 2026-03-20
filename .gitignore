@@ -66,3 +66,4 @@ Thumbs.db  # Windows系统缩略图缓存
 cache
 download
 patch
+/requirements.txt
